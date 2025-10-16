@@ -2,18 +2,30 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: hipster-shop-monitor
-  namespace: monitoring
+  namespace: monitoring     # 👈 should be in the monitoring namespace, where Prometheus runs
   labels:
-    release: monitoring
+    release: monitoring      # 👈 must match your Prometheus release label (yours was "monitoring", not "hipster-shop")
 spec:
   selector:
     matchExpressions:
-      - {key: app, operator: In, values: ["adservice","cartservice","checkoutservice","currencyservice","emailservice","frontend","paymentservice","productcatalogservice","recommendationservice","shippingservice"]}
+      - key: app
+        operator: In
+        values:
+          - adservice
+          - cartservice
+          - checkoutservice
+          - currencyservice
+          - emailservice
+          - frontend
+          - paymentservice
+          - productcatalogservice
+          - recommendationservice
+          - shippingservice
   namespaceSelector:
     matchNames:
-      - default
+      - hipster-shop          # 👈 your services live in hipster-shop, not default
   endpoints:
-    - port: grpc
+    - port: metrics           # 👈 should match the sidecar container port name (we defined `name: metrics`)
       interval: 15s
       path: /metrics
       scheme: http

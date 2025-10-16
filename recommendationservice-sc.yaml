@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommendationservice
+  namespace: hipster-shop
+  labels:
+    app: recommendationservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recommendationservice
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: recommendationservice
+    spec:
+      serviceAccountName: recommendationservice
+      imagePullSecrets:
+        - name: dockerhub-cred
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        # --- Main Recommendation Service ---
+        - name: server
+          image: us-central1-docker.pkg.dev/google-samples/microservices-demo/recommendationservice:v0.10.3
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "8080"
+            - name: PRODUCT_CATALOG_SERVICE_ADDR
+              value: productcatalogservice:3550
+            - name: DISABLE_PROFILER
+              value: "1"
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            grpc:
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            grpc:
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 220Mi
+            limits:
+              cpu: 200m
+              memory: 450Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ "ALL" ]
+            privileged: false
+            readOnlyRootFilesystem: true
+
+        # --- Prometheus Metrics Sidecar ---
+        - name: prometheus-sidecar
+          image: prom/statsd-exporter:latest
+          args:
+            - "--web.listen-address=:9102"
+          ports:
+            - containerPort: 9102
+              name: metrics
+          resources:
+            requests:
+              cpu: 50m
+              memory: 50Mi
+            limits:
+              cpu: 100m
+              memory: 100Mi
+

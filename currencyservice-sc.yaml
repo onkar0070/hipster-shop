@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: currencyservice
+  namespace: hipster-shop
+  labels:
+    app: currencyservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: currencyservice
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: currencyservice
+    spec:
+      serviceAccountName: currencyservice
+      imagePullSecrets:
+        - name: dockerhub-cred
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        # --- Main Currency Service ---
+        - name: server
+          image: us-central1-docker.pkg.dev/google-samples/microservices-demo/currencyservice:v0.10.3
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "7000"
+            - name: DISABLE_PROFILER
+              value: "1"
+          ports:
+            - containerPort: 7000
+              name: grpc
+              protocol: TCP
+          livenessProbe:
+            grpc:
+              port: 7000
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            grpc:
+              port: 7000
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ "ALL" ]
+            privileged: false
+            readOnlyRootFilesystem: true
+
+        # --- Prometheus Metrics Sidecar ---
+        - name: prometheus-sidecar
+          image: prom/statsd-exporter:latest
+          args:
+            - "--web.listen-address=:9102"
+          ports:
+            - containerPort: 9102
+              name: metrics
+          resources:
+            requests:
+              cpu: 50m
+              memory: 50Mi
+            limits:
+              cpu: 100m
+              memory: 100Mi
+
